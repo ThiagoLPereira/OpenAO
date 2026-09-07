@@ -286,6 +286,90 @@ class LoadMaps {
             resolve(mapNum);
         });
     }
+
+    async reloadMap(mapNum: number): Promise<{ mapNum: number; reloaded: boolean; charactersPreserved: number; npcsPreserved: number }> {
+        if (!this.mapFilesExist(mapNum)) {
+            return { mapNum, reloaded: false, charactersPreserved: 0, npcsPreserved: 0 };
+        }
+
+        const activeCharacters: Array<{ id: number; x: number; y: number }> = [];
+        if (vars.personajes) {
+            for (const char of Object.values(vars.personajes) as any[]) {
+                if (char && toNumber(char.map) === mapNum && char.pos && char.id) {
+                    activeCharacters.push({ id: Number(char.id), x: toNumber(char.pos.x), y: toNumber(char.pos.y) });
+                }
+            }
+        }
+
+        const activeNpcs: Array<{ id: number; x: number; y: number }> = [];
+        if (vars.npcs) {
+            for (const npc of Object.values(vars.npcs) as any[]) {
+                if (npc && toNumber(npc.map) === mapNum && npc.pos && npc.id) {
+                    activeNpcs.push({ id: Number(npc.id), x: toNumber(npc.pos.x), y: toNumber(npc.pos.y) });
+                }
+            }
+        }
+
+        await this.readMap(mapNum);
+
+        let charactersPreserved = 0;
+        for (const char of activeCharacters) {
+            if (vars.mapData[mapNum]?.[char.y]?.[char.x]) {
+                vars.mapData[mapNum][char.y][char.x].id = char.id;
+                charactersPreserved += 1;
+            }
+        }
+
+        let npcsPreserved = 0;
+        for (const npc of activeNpcs) {
+            if (vars.mapData[mapNum]?.[npc.y]?.[npc.x]) {
+                vars.mapData[mapNum][npc.y][npc.x].id = npc.id;
+                npcsPreserved += 1;
+            }
+        }
+
+        return {
+            mapNum,
+            reloaded: true,
+            charactersPreserved,
+            npcsPreserved,
+        };
+    }
+
+    async reloadAllMaps(): Promise<{ reloadedMaps: number[]; charactersPreserved: number; npcsPreserved: number }> {
+        const reloadedMaps: number[] = [];
+        let totalCharactersPreserved = 0;
+        let totalNpcsPreserved = 0;
+        const extraTestMaps = [500, 501, 502, 503, 504, 505, 506];
+
+        for (let i = 1; i < 291; i++) {
+            if (this.mapFilesExist(i)) {
+                const res = await this.reloadMap(i);
+                if (res.reloaded) {
+                    reloadedMaps.push(i);
+                    totalCharactersPreserved += res.charactersPreserved;
+                    totalNpcsPreserved += res.npcsPreserved;
+                }
+            }
+        }
+
+        for (const mapId of extraTestMaps) {
+            if (this.mapFilesExist(mapId)) {
+                const res = await this.reloadMap(mapId);
+                if (res.reloaded) {
+                    reloadedMaps.push(mapId);
+                    totalCharactersPreserved += res.charactersPreserved;
+                    totalNpcsPreserved += res.npcsPreserved;
+                }
+            }
+        }
+
+        return {
+            reloadedMaps,
+            charactersPreserved: totalCharactersPreserved,
+            npcsPreserved: totalNpcsPreserved,
+        };
+    }
 }
 
 module.exports = LoadMaps;

@@ -47,6 +47,12 @@ export type ReloadCraftingRecipesDiffResult = {
     updatedRecipes: number;
 };
 
+export type ReloadMapsDiffResult = {
+    reloadedMaps: number[];
+    charactersPreserved: number;
+    npcsPreserved: number;
+};
+
 export type InitializeNpcTemplatesResult = {
     currentVersion: number;
     loadedTemplates: number;
@@ -493,6 +499,22 @@ async function initializeBalanceFromApi(): Promise<InitializeBalanceResult> {
     };
 }
 
+async function reloadMapsDiff(mapNum?: number): Promise<ReloadMapsDiffResult> {
+    const LoadMaps = require("./loadMaps");
+    const loader = new LoadMaps();
+
+    if (typeof mapNum === "number" && mapNum > 0) {
+        const singleResult = await loader.reloadMap(mapNum);
+        return {
+            reloadedMaps: singleResult.reloaded ? [mapNum] : [],
+            charactersPreserved: singleResult.charactersPreserved,
+            npcsPreserved: singleResult.npcsPreserved,
+        };
+    }
+
+    return await loader.reloadAllMaps();
+}
+
 export {
     initializeBalanceFromApi,
     initializeCraftingRecipesFromApi,
@@ -501,6 +523,7 @@ export {
     initializeSmeltingRecipesFromApi,
     reloadBalanceDiff,
     reloadCraftingRecipesDiff,
+    reloadMapsDiff,
     reloadObjectsDiff,
     reloadNpcsDiff,
 };
