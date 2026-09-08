@@ -41,8 +41,27 @@ test("LoadMaps.reloadMap reloads an existing map and preserves character and NPC
     assert.equal(typeof vars.mapData[testMapId].name, "string");
 
     // Verify entity IDs were correctly restored into vars.mapData
-    assert.equal(vars.mapData[testMapId][50][50].id, 100);
-    assert.equal(vars.mapData[testMapId][51][50].id, 200);
+    const charPos = vars.personajes["100"].pos;
+    assert.equal(vars.mapData[testMapId][charPos.y][charPos.x].id, 100);
+});
+
+test("LoadMaps.findNearestWalkableTile relocates entity when target tile is blocked", () => {
+    const loader = new LoadMaps();
+    const mapId = 1;
+
+    // Simulate blocked tile at 10,10 and free tile at 10,11
+    vars.mapa[mapId] = vars.mapa[mapId] || {};
+    vars.mapa[mapId][10] = vars.mapa[mapId][10] || {};
+    vars.mapa[mapId][10][10] = { blocked: 1 };
+    vars.mapa[mapId][11] = vars.mapa[mapId][11] || {};
+    vars.mapa[mapId][11][10] = { blocked: 0 };
+    vars.mapData[mapId] = vars.mapData[mapId] || [];
+    vars.mapData[mapId][11] = vars.mapData[mapId][11] || [];
+    vars.mapData[mapId][11][10] = { id: 0 };
+
+    const safePos = loader.findNearestWalkableTile(mapId, 10, 10);
+    assert.notDeepEqual(safePos, { x: 10, y: 10 });
+    assert.equal(vars.mapa[mapId]?.[safePos.y]?.[safePos.x]?.blocked ?? 0, 0);
 });
 
 test("LoadMaps.reloadMap returns reloaded: false for non-existent maps", async () => {

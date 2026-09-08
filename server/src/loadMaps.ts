@@ -287,46 +287,58 @@ class LoadMaps {
         });
     }
 
+    findNearestWalkableTile(mapNum: number, startX: number, startY: number): { x: number; y: number } {
+        if (!vars.mapa[mapNum]?.[startY]?.[startX]?.blocked) {
+            return { x: startX, y: startY };
+        }
+
+        for (let radius = 1; radius <= 5; radius++) {
+            for (let dy = -radius; dy <= radius; dy++) {
+                for (let dx = -radius; dx <= radius; dx++) {
+                    const checkX = startX + dx;
+                    const checkY = startY + dy;
+                    if (
+                        checkX >= 1 &&
+                        checkX <= 100 &&
+                        checkY >= 1 &&
+                        checkY <= 100 &&
+                        vars.mapa[mapNum]?.[checkY]?.[checkX] &&
+                        !vars.mapa[mapNum][checkY][checkX].blocked &&
+                        vars.mapData[mapNum]?.[checkY]?.[checkX]?.id === 0
+                    ) {
+                        return { x: checkX, y: checkY };
+                    }
+                }
+            }
+        }
+        return { x: startX, y: startY };
+    }
+
+    private reconcileEntities(source: Record<string, any> | undefined, mapNum: number): number {
+        if (!source) return 0;
+        let count = 0;
+        for (const entity of Object.values(source) as any[]) {
+            if (entity && toNumber(entity.map) === mapNum && entity.pos && entity.id) {
+                const safe = this.findNearestWalkableTile(mapNum, toNumber(entity.pos.x), toNumber(entity.pos.y));
+                entity.pos = { x: safe.x, y: safe.y };
+                if (vars.mapData[mapNum]?.[safe.y]?.[safe.x]) {
+                    vars.mapData[mapNum][safe.y][safe.x].id = Number(entity.id);
+                    count += 1;
+                }
+            }
+        }
+        return count;
+    }
+
     async reloadMap(mapNum: number): Promise<{ mapNum: number; reloaded: boolean; charactersPreserved: number; npcsPreserved: number }> {
         if (!this.mapFilesExist(mapNum)) {
             return { mapNum, reloaded: false, charactersPreserved: 0, npcsPreserved: 0 };
         }
 
-        const activeCharacters: Array<{ id: number; x: number; y: number }> = [];
-        if (vars.personajes) {
-            for (const char of Object.values(vars.personajes) as any[]) {
-                if (char && toNumber(char.map) === mapNum && char.pos && char.id) {
-                    activeCharacters.push({ id: Number(char.id), x: toNumber(char.pos.x), y: toNumber(char.pos.y) });
-                }
-            }
-        }
-
-        const activeNpcs: Array<{ id: number; x: number; y: number }> = [];
-        if (vars.npcs) {
-            for (const npc of Object.values(vars.npcs) as any[]) {
-                if (npc && toNumber(npc.map) === mapNum && npc.pos && npc.id) {
-                    activeNpcs.push({ id: Number(npc.id), x: toNumber(npc.pos.x), y: toNumber(npc.pos.y) });
-                }
-            }
-        }
-
         await this.readMap(mapNum);
 
-        let charactersPreserved = 0;
-        for (const char of activeCharacters) {
-            if (vars.mapData[mapNum]?.[char.y]?.[char.x]) {
-                vars.mapData[mapNum][char.y][char.x].id = char.id;
-                charactersPreserved += 1;
-            }
-        }
-
-        let npcsPreserved = 0;
-        for (const npc of activeNpcs) {
-            if (vars.mapData[mapNum]?.[npc.y]?.[npc.x]) {
-                vars.mapData[mapNum][npc.y][npc.x].id = npc.id;
-                npcsPreserved += 1;
-            }
-        }
+        const charactersPreserved = this.reconcileEntities(vars.personajes, mapNum);
+        const npcsPreserved = this.reconcileEntities(vars.npcs, mapNum);
 
         return {
             mapNum,
@@ -340,27 +352,17 @@ class LoadMaps {
         const reloadedMaps: number[] = [];
         let totalCharactersPreserved = 0;
         let totalNpcsPreserved = 0;
-        const extraTestMaps = [500, 501, 502, 503, 504, 505, 506];
 
-        for (let i = 1; i < 291; i++) {
-            if (this.mapFilesExist(i)) {
-                const res = await this.reloadMap(i);
-                if (res.reloaded) {
-                    reloadedMaps.push(i);
-                    totalCharactersPreserved += res.charactersPreserved;
-                    totalNpcsPreserved += res.npcsPreserved;
-                }
-            }
-        }
+        const allCandidateMapIds = Array.from({ length: 290 }, (_, i) => i + 1)
+            .concat([500, 501, 502, 503, 504, 505, 506])
+            .filter((mapId) => this.mapFilesExist(mapId));
 
-        for (const mapId of extraTestMaps) {
-            if (this.mapFilesExist(mapId)) {
-                const res = await this.reloadMap(mapId);
-                if (res.reloaded) {
-                    reloadedMaps.push(mapId);
-                    totalCharactersPreserved += res.charactersPreserved;
-                    totalNpcsPreserved += res.npcsPreserved;
-                }
+        for (const mapId of allCandidateMapIds) {
+            const res = await this.reloadMap(mapId);
+            if (res.reloaded) {
+                reloadedMaps.push(mapId);
+                totalCharactersPreserved += res.charactersPreserved;
+                totalNpcsPreserved += res.npcsPreserved;
             }
         }
 
