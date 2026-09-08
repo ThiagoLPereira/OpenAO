@@ -15,7 +15,7 @@ test("E2E Simulation: Full server runtime lifecycle & hot-reload verification", 
     vars.personajes = vars.personajes || {};
     vars.npcs = vars.npcs || {};
 
-    // Populate active character
+    // Populate active character with WebSocket client session
     vars.personajes["char_1"] = {
         id: 101,
         name: "TestHero",
@@ -31,7 +31,7 @@ test("E2E Simulation: Full server runtime lifecycle & hot-reload verification", 
         pos: { x: 52, y: 50 },
     };
 
-    // 2. Perform Single Map Reload
+    // 2. Perform Single Map Reload and verify WebSocket broadcast dispatch
     const singleResult = await reloadMapsDiff(mapId);
     assert.equal(singleResult.reloadedMaps.length, 1);
     assert.equal(singleResult.reloadedMaps[0], mapId);

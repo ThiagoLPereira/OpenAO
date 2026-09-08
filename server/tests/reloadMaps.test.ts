@@ -87,6 +87,19 @@ test("reloadMapsDiff reloads specific map via gameDataSync bridge", async () => 
     assert.equal(typeof result.npcsPreserved, "number");
 });
 
+test("reloadMapsDiff triggers WebSocket broadcast notification to active characters", async () => {
+    vars.personajes = vars.personajes || {};
+    vars.personajes["char_ws_test"] = {
+        id: 777,
+        map: 1,
+        pos: { x: 50, y: 50 },
+    };
+
+    const result = await reloadMapsDiff(1);
+    assert.equal(result.reloadedMaps.length, 1);
+    assert.ok(result.charactersPreserved >= 1);
+});
+
 test("reloadMapsDiff handles invalid map IDs safely without crashing", async () => {
     const result = await reloadMapsDiff(88888);
 

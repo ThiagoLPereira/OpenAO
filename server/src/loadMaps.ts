@@ -50,8 +50,9 @@ type SpecialsMap = {
 
 const MAPS_SOURCE_DIR = path.join(__dirname, "../mapas_source");
 
-function readJsonFile(filePath: string) {
-    return JSON.parse(fs.readFileSync(filePath, "utf8"));
+async function readJsonFile(filePath: string) {
+    const data = await fs.promises.readFile(filePath, "utf8");
+    return JSON.parse(data);
 }
 
 function toNumber(value: unknown, fallback = 0): number {
@@ -157,18 +158,13 @@ class LoadMaps {
 
     async initialize() {
         const arMapsToLoad: Array<Promise<unknown>> = [];
-        const extraTestMaps = [500, 501, 502, 503, 504, 505, 506];
 
-        for (let i = 1; i < 291; i++) {
-            if (this.mapFilesExist(i)) {
-                arMapsToLoad.push(this.readMap(i));
-            }
-        }
+        const allCandidateMapIds = Array.from({ length: 290 }, (_, i) => i + 1)
+            .concat([500, 501, 502, 503, 504, 505, 506])
+            .filter((mapId) => this.mapFilesExist(mapId));
 
-        for (const mapId of extraTestMaps) {
-            if (this.mapFilesExist(mapId)) {
-                arMapsToLoad.push(this.readMap(mapId));
-            }
+        for (const mapId of allCandidateMapIds) {
+            arMapsToLoad.push(this.readMap(mapId));
         }
 
         await Promise.all(arMapsToLoad);
@@ -179,15 +175,17 @@ class LoadMaps {
         await LoadNpcs.initialize();
     }
 
-    readMap(mapNum: number) {
-        return new Promise((resolve: (value: number) => void) => {
-            const mapDir = this.getMapDirectory(mapNum);
-            const metadata = readJsonFile(path.join(mapDir, "meta.json")) as MapMetadata;
-            const terrain = readJsonFile(path.join(mapDir, "terrain.json")) as TerrainMap;
-            const specialsPath = path.join(mapDir, "specials.json");
-            const specials = fs.existsSync(specialsPath)
-                ? (readJsonFile(specialsPath) as SpecialsMap)
-                : ({ exits: {}, objects: {}, npcs: {}, triggers: {} } as SpecialsMap);
+    async readMap(mapNum: number): Promise<number> {
+        const mapDir = this.getMapDirectory(mapNum);
+        const metadata = (await readJsonFile(path.join(mapDir, "meta.json"))) as MapMetadata;
+        const terrain = (await readJsonFile(path.join(mapDir, "terrain.json"))) as TerrainMap;
+        const specialsPath = path.join(mapDir, "specials.json");
+        let specials: SpecialsMap;
+        try {
+            specials = (await readJsonFile(specialsPath)) as SpecialsMap;
+        } catch {
+            specials = { exits: {}, objects: {}, npcs: {}, triggers: {} } as SpecialsMap;
+        }
             const palette = terrain.palette ?? {};
             const rows = Array.isArray(terrain.rows) ? terrain.rows : [];
             const width = Math.max(1, toNumber(terrain.width, 100));
@@ -283,8 +281,7 @@ class LoadMaps {
             vars.mapData[mapNum].backup = toNumber(metadata.backup);
             vars.mapData[mapNum].pk = toNumber(metadata.pk);
 
-            resolve(mapNum);
-        });
+            return mapNum;
     }
 
     findNearestWalkableTile(mapNum: number, startX: number, startY: number): { x: number; y: number } {
